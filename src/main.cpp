@@ -9,6 +9,9 @@
 // To use EEPROM see:
 // http://www.nongnu.org/avr-libc/user-manual/group__avr__eeprom.html
 
+// Global variables
+bool auto_rclk = false;
+
 static void print_commands();
 
 static void pulse_srclk()
@@ -32,9 +35,10 @@ static void print_commands()
     usart_sendString("r -> pulse RCLK\n");
     usart_sendString("k -> pulse SRCLK\n");
     usart_sendString("c -> toggle SRCLR\n");
-    usart_sendString("1 -> send byte 1 + SRCLK\n");
-    usart_sendString("0 -> send byte 0 + SRCLK\n");
+    usart_sendString("1 -> set SER high + SRCLK\n");
+    usart_sendString("0 -> set SER low + SRCLK\n");
     usart_sendString("t -> show status\n");
+    usart_sendString("R -> enable/disable auto RCLK\n");
 }
 
 /**
@@ -78,7 +82,8 @@ static inline void main_loop()
 
     switch (byte)
     {
-    case 's': // toggle SER input
+    // Toggle SER input high/low
+    case 's':
         HC595_PORT ^= _BV(SER_PIN);
         if (HC595_PORT & _BV(SER_PIN))
         {
@@ -91,66 +96,120 @@ static inline void main_loop()
             usart_sendString("SER low\n");
         }
         break;
-    case 'o': // toggle output enable
+
+    // Toggle Output Enable (OE) on/off
+    case 'o':
         HC595_PORT ^= _BV(OE_PIN);
         if (HC595_PORT & _BV(OE_PIN))
             usart_sendString("OE off\n");
         else
             usart_sendString("OE on\n");
         break;
-    case 'r': // generate pulse on RCLK
+
+    // Generate pulse on RCLK
+    case 'r': 
         pulse_rclk();
-        usart_sendString("RCLK\n");
+        usart_sendString(" RCLK ");
         break;
-    case 'k': // generate pulse on SRCLK
+
+    // Generate pulse on SRCLK
+    case 'k': 
         pulse_srclk();
-        usart_sendString("SRCLK\n");
+        usart_sendString(" SRCLK ");
         break;
-    case 'c': // toggle SRCLR
+
+    // Toggle SRCLR on/off
+    case 'c': 
         HC595_PORT ^= _BV(SRCLR_PIN);
         if (HC595_PORT & _BV(SRCLR_PIN))
-            usart_sendString("SRCLR off\n");
+            usart_sendString("\nSRCLR off\n");
         else
-            usart_sendString("SRCLR on\n");
+            usart_sendString("\nSRCLR on\n");
         break;
-    case '1':
+
+    // Set SER high + pulse SRCLK
+    case '1': 
         HC595_PORT |= _BV(SER_PIN);
         pulse_srclk();
+
+        // if auto RCLK is enabled, pulse RCLK
+        if (auto_rclk)
+            pulse_rclk();
+
+        // echo
         usart_sendString("1");
         break;
-    case '0':
+
+    // Set SER low + pulse SRCLK
+    case '0': 
         HC595_PORT &= ~_BV(SER_PIN);
         pulse_srclk();
+
+        // if auto RCLK is enabled, pulse RCLK
+        if (auto_rclk)
+            pulse_rclk();
+
+        // echo
         usart_sendString("0");
         break;
-    case '\r':
-    case '\n':
-        usart_sendString("\n");
-        break;
-    case 't':
-        usart_sendString("---\nOE: ");
+
+    // Show status
+    case 't': 
+
+        // Output Enable (OE) status
+        usart_sendString("\n---\nOE: ");
         if (HC595_PORT & _BV(OE_PIN))
             usart_sendString("off\n");
         else
             usart_sendString("on\n");
+
+        // Serial Data (SER) status
         usart_sendString("SER: ");
         if (HC595_PORT & _BV(SER_PIN))
             usart_sendString("high\n");
         else
             usart_sendString("low\n");
+
+        // Serial Clear (SRCLR) status
         usart_sendString("SRCLR: ");
         if (HC595_PORT & _BV(SRCLR_PIN))
             usart_sendString("off\n");
         else
             usart_sendString("on\n");
+
+        // Auto RCLK status
+        if (auto_rclk)
+            usart_sendString("Auto RCLK: enabled\n");
+        else
+            usart_sendString("Auto RCLK: disabled\n");
+        usart_sendString("---\n");
         break;
-    default:
-        usart_sendString("Unknown command: ");
-        usart_sendByte(byte);
-        usart_sendString("\n");
+
+    // Enable/disable auto RCLK
+    case 'R':
+        auto_rclk = !auto_rclk;
+        if (auto_rclk)
+            usart_sendString("\nAuto RCLK enabled\n");
+        else
+            usart_sendString("\nAuto RCLK disabled\n");
+        break;
+
+    // show help
     case 'h':
         print_commands();
         break;
+
+    // line feed echo
+    case '\r':
+    case '\n':
+        usart_sendString("\n");
+        break;
+
+    // show error and tip for help
+    default:
+        usart_sendString("Unknown command: ");
+        usart_sendByte(byte);
+        usart_sendString("\nPress h for help\n");
     }
 }
 
