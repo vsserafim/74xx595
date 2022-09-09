@@ -97,7 +97,7 @@ static inline void mcu_init()
      * turn on PULL-UPs (see AVR4013). */
     PORTB = ~PORTB_OUTPUTS;
     PORTC = ~PORTC_OUTPUTS;
-    PORTD = ~(PORTD_OUTPUTS | USED_AIN_PINS);
+    PORTD = (uint8_t)(~(PORTD_OUTPUTS | USED_AIN_PINS));
 
     /* DIGITAL INPUT DISABLE REGISTER (DIDR) 0
      * Disable ADC pins */
