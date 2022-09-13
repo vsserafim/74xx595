@@ -12,22 +12,25 @@
 // Global variables
 bool auto_rclk = false;
 
-static void print_commands();
-
 static void pulse_srclk()
 {
+    // set SRLCK to high
     HC595_PORT |= _BV(SRCLK_PIN);
     _delay_us(1);
+    // set SRLCK to low
     HC595_PORT &= ~_BV(SRCLK_PIN);
 }
 
 static void pulse_rclk()
 {
+    // set RCLK to high
     HC595_PORT |= _BV(RCLK_PIN);
     _delay_us(1);
+    // set RCLK to low
     HC595_PORT &= ~_BV(RCLK_PIN);
 }
 
+// print valid commands
 static void print_commands()
 {
     usart_sendString("s -> toggle SER value\n");
@@ -39,6 +42,8 @@ static void print_commands()
     usart_sendString("0 -> set SER low + SRCLK\n");
     usart_sendString("t -> show status\n");
     usart_sendString("R -> enable/disable auto RCLK\n");
+    usart_sendString("H -> halt MCU\n");
+    usart_sendString("h -> print this help\n");
 }
 
 /**
@@ -50,23 +55,19 @@ int main(void)
     mcu_init();
 
     /* here goes the setup not covered by mcu_init */
-
-#ifdef BAUD
     usart_init();
     usart_rx(true);
-    usart_sendString("avr-pio-template\n");
-#endif
-
-    print_commands();
 
     // disable OE
     HC595_PORT |= _BV(OE_PIN);
 
-    /* main loop */
+    usart_sendString("avr-pio-template\n");
+    print_commands();
+
     while (1)
         main_loop();
 
-    // as long as you have an infinite loop above, this will never happen
+    // this will happen if you press H
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     cli();
     sleep_mode();
@@ -107,19 +108,19 @@ static inline void main_loop()
         break;
 
     // Generate pulse on RCLK
-    case 'r': 
+    case 'r':
         pulse_rclk();
         usart_sendString(" RCLK ");
         break;
 
     // Generate pulse on SRCLK
-    case 'k': 
+    case 'k':
         pulse_srclk();
         usart_sendString(" SRCLK ");
         break;
 
     // Toggle SRCLR on/off
-    case 'c': 
+    case 'c':
         HC595_PORT ^= _BV(SRCLR_PIN);
         if (HC595_PORT & _BV(SRCLR_PIN))
             usart_sendString("\nSRCLR off\n");
@@ -128,7 +129,7 @@ static inline void main_loop()
         break;
 
     // Set SER high + pulse SRCLK
-    case '1': 
+    case '1':
         HC595_PORT |= _BV(SER_PIN);
         pulse_srclk();
 
@@ -141,7 +142,7 @@ static inline void main_loop()
         break;
 
     // Set SER low + pulse SRCLK
-    case '0': 
+    case '0':
         HC595_PORT &= ~_BV(SER_PIN);
         pulse_srclk();
 
@@ -154,10 +155,11 @@ static inline void main_loop()
         break;
 
     // Show status
-    case 't': 
+    case 't':
+        usart_sendString("\n---\n");
 
         // Output Enable (OE) status
-        usart_sendString("\n---\nOE: ");
+        usart_sendString("OE: ");
         if (HC595_PORT & _BV(OE_PIN))
             usart_sendString("off\n");
         else
@@ -182,6 +184,7 @@ static inline void main_loop()
             usart_sendString("Auto RCLK: enabled\n");
         else
             usart_sendString("Auto RCLK: disabled\n");
+
         usart_sendString("---\n");
         break;
 
@@ -204,6 +207,13 @@ static inline void main_loop()
     case '\n':
         usart_sendString("\n");
         break;
+
+    // halt MCU
+    case 'H':
+        usart_sendString("MCU halted\n");
+        _delay_ms(100);
+        // return to main
+        return;
 
     // show error and tip for help
     default:
