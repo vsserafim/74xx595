@@ -61,7 +61,7 @@ int main(void)
     // disable OE
     HC595_PORT |= _BV(OE_PIN);
 
-    usart_sendString("avr-pio-template\n");
+    usart_sendString("74xx595 Controller\n");
     print_commands();
 
     while (1)
